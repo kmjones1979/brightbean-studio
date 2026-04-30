@@ -38,7 +38,7 @@ You can deploy it with a one-click button on Heroku, Render, or Railway, run it 
 | **Media library** | Org- and workspace-scoped libraries with nested folders, auto-generated platform-optimized variants, and alt text. |
 | **Client portal** | Passwordless 30-day magic-link access so clients can approve or reject posts without creating an account. |
 | **Notifications** | In-app, email, and webhook delivery with per-user preferences for every event type. |
-| **Security & ops** | Encrypted token & credential storage, optional 2FA (TOTP), Google/GitHub SSO, Sentry support, and a 7-day reversible org-deletion grace period. |
+| **Security & ops** | Encrypted token & credential storage, Google SSO, Sentry support, and a 14-day reversible org-deletion grace period. 2FA (TOTP) is on the roadmap. |
 | **White-label friendly** | Per-workspace branding (logo, colors) and workspace defaults for hashtags, first comments, and posting templates. |
 
 ### A quick look
@@ -63,7 +63,7 @@ You can deploy it with a one-click button on Heroku, Render, or Railway, run it 
 | <img src="https://cdn.simpleicons.org/instagram" width="16" height="16"> Instagram (Personal) | ✓ | ✓ | ✓ | ✓ |
 | <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Personal) | ✓ | ✓ | — | ✓ |
 | <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Company) | ✓ | ✓ | — | ✓ |
-| <img src="https://cdn.simpleicons.org/tiktok" width="16" height="16"> TikTok | ✓ | ✓ | — | ✓ |
+| <img src="https://cdn.simpleicons.org/tiktok" width="16" height="16"> TikTok | ✓ | — | — | ✓ |
 | <img src="https://cdn.simpleicons.org/youtube" width="16" height="16"> YouTube | ✓ | ✓ | — | ✓ |
 | <img src="https://cdn.simpleicons.org/pinterest" width="16" height="16"> Pinterest | ✓ | — | — | ✓ |
 | <img src="https://cdn.simpleicons.org/threads" width="16" height="16"> Threads | ✓ | ✓ | — | ✓ |
@@ -77,12 +77,13 @@ You can deploy it with a one-click button on Heroku, Render, or Railway, run it 
 
 | Heroku | Render | Railway |
 |:------:|:------:|:-------:|
-| [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/brightbeanxyz/brightbean-studio) | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/brightbeanxyz/brightbean-studio) | [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https://github.com/brightbeanxyz/brightbean-studio&referralCode=brightbean) |
+| [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/brightbeanxyz/brightbean-studio) | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/brightbeanxyz/brightbean-studio) | [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/brightbean-studio?referralCode=brightbean) |
 
 After deploying, set these environment variables in your platform's dashboard:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
+| `DJANGO_SETTINGS_MODULE` | Auto-set | `config.settings.production`. Set if deployment config has not placed it. |
 | `SECRET_KEY` | Auto-generated | Django secret key. Set automatically by the deploy button. |
 | `ENCRYPTION_KEY_SALT` | Auto-generated | Encryption salt. Set automatically by the deploy button. |
 | `DATABASE_URL` | Auto-provisioned | PostgreSQL connection string. Set automatically. |
@@ -267,19 +268,17 @@ cp .env.example .env
 #   APP_URL=https://yourdomain.com
 #   DATABASE_URL=postgres://postgres:<strong-password>@postgres:5432/brightbean
 
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-docker compose exec app python manage.py migrate
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose exec app python manage.py createsuperuser
 ```
 
-This starts 4 containers: app (Gunicorn), worker, PostgreSQL, and Caddy (auto-HTTPS). Edit the `Caddyfile` with your domain.
+This starts 5 containers: app (Gunicorn), worker, PostgreSQL, Caddy (auto-HTTPS), and a one-shot migrate container that runs database migrations automatically on startup. Edit the `Caddyfile` with your domain.
 
 To update:
 
 ```bash
 git pull
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-docker compose exec app python manage.py migrate
 ```
 
 ### Other Platforms
@@ -336,19 +335,7 @@ brightbean-studio/
 └── render.yaml                # Render blueprint
 ```
 
-## Environment Variables
-
-All configuration is via environment variables. See `.env.example` for the full list.
-
-Key variables for local development:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SECRET_KEY` | (required) | Django secret key. Any random string for dev. |
-| `DEBUG` | `false` | Set to `true` for local development. |
-| `DATABASE_URL` | - | PostgreSQL connection string. |
-| `STORAGE_BACKEND` | `local` | `local` for filesystem, `s3` for S3-compatible storage. |
-| `EMAIL_BACKEND_TYPE` | `smtp` | Set to `smtp` for SMTP or leave default (console in dev). |
+> **Settings selection:** The `DJANGO_SETTINGS_MODULE` environment variable controls which settings file Django uses. The defaults are already wired for each context: `manage.py` uses `development`, `wsgi.py`/`asgi.py` use `production`, and `pytest` uses `test` (via `pyproject.toml`). Docker Compose files and platform deploy configs (Heroku, Render) also set it explicitly. You only need to override it manually if you want a non-default module for a specific command, e.g. `DJANGO_SETTINGS_MODULE=config.settings.production python manage.py check --deploy`.
 
 ## Platform Credentials
 
@@ -442,12 +429,12 @@ Brightbean uses a **single LinkedIn app** (with Community Management API) for bo
 ### TikTok
 
 1. Go to the [TikTok Developer Portal](https://developers.tiktok.com/) and create a new app
-2. Add the products **Login Kit**, **Content Posting API**, and **Comment API**
+2. Add the products **Login Kit** and **Content Posting API**
 3. Configure the redirect URI under your app's settings:
    ```
    {APP_URL}/social-accounts/callback/tiktok/
    ```
-4. Required scopes: `user.info.basic`, `video.publish`, `video.upload`, `comment.list`, `comment.list.manage`
+4. Required scopes: `user.info.basic`, `video.publish`, `video.upload`
 5. Note: TikTok uses **Client Key** (not Client ID). Copy the **Client Key** and **Client Secret** from your app dashboard
 6. Set the environment variables:
    ```
@@ -499,7 +486,7 @@ YouTube and Google Business Profile share the same Google Cloud credentials.
 No developer app registration needed. Users connect by entering their Bluesky handle and an **App Password**:
 
 1. Log in to [Bluesky](https://bsky.app/)
-2. Go to **Settings → App Passwords**
+2. Go to **Settings → Privacy and Security → App Passwords**
 3. Create a new app password and use it when connecting your account in Brightbean
 
 ### Mastodon

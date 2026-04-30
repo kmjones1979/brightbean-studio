@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urlparse
 
 import environ
 
@@ -42,7 +43,7 @@ THIRD_PARTY_APPS = [
     "django_htmx",
     "tailwind",
     "csp",
-    "background_task",
+    "apps.background_task_config.BackgroundTaskConfig",
 ]
 
 LOCAL_APPS = [
@@ -62,6 +63,7 @@ LOCAL_APPS = [
     "apps.approvals",
     "apps.client_portal",
     "apps.onboarding",
+    "apps.gtm",
     "theme",
 ]
 
@@ -160,7 +162,7 @@ STORAGES = {
 
 # Media files
 STORAGE_BACKEND = env("STORAGE_BACKEND")
-if STORAGE_BACKEND == "s3":
+if STORAGE_BACKEND.lower() == "s3":
     STORAGES["default"] = {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
     }
@@ -190,6 +192,7 @@ SITE_ID = 1
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*"]
 ACCOUNT_EMAIL_VERIFICATION = "optional"
+ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 LOGIN_REDIRECT_URL = "/"
 ACCOUNT_LOGOUT_REDIRECT_URL = "/accounts/login/"
@@ -245,15 +248,28 @@ else:
 # Tailwind
 TAILWIND_APP_NAME = "theme"
 
-# CSP - Using Alpine.js CSP build (@alpinejs/csp) which does not require
-# unsafe-eval. Styles use unsafe-inline because Tailwind utility classes are inline.
+# CSP - Alpine.js standard build requires unsafe-eval for inline expression
+# evaluation. Styles use unsafe-inline because Tailwind utility classes are inline.
 CSP_DEFAULT_SRC = ("'self'",)
-CSP_SCRIPT_SRC = ("'self'",)  # Alpine.js CSP build (@alpinejs/csp) eliminates unsafe-eval
-CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")  # Tailwind inline styles
+CSP_SCRIPT_SRC = ("'self'", "'unsafe-eval'", "https://cdn.jsdelivr.net")
+CSP_STYLE_SRC = ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net")
 CSP_IMG_SRC = ("'self'", "data:", "https:")
 CSP_FONT_SRC = ("'self'",)
 CSP_CONNECT_SRC = ("'self'",)
+CSP_MEDIA_SRC = ("'self'", "blob:")
 CSP_FORM_ACTION = ("'self'", "https://accounts.google.com")
+CSP_INCLUDE_NONCE_IN = ["script-src"]
+
+# Allow media/images from the storage domain in CSP
+if STORAGE_BACKEND.lower() == "s3":
+    _storage_origin = AWS_S3_CUSTOM_DOMAIN or AWS_S3_ENDPOINT_URL
+    if _storage_origin:
+        if not _storage_origin.startswith("https://"):
+            _storage_origin = f"https://{_storage_origin}"
+        _parsed = urlparse(_storage_origin)
+        _storage_origin = f"{_parsed.scheme}://{_parsed.hostname}"
+        CSP_MEDIA_SRC = (*CSP_MEDIA_SRC, _storage_origin)  # type: ignore[assignment]
+        CSP_IMG_SRC = (*CSP_IMG_SRC, _storage_origin)  # type: ignore[assignment]
 
 # Media Library
 MEDIA_LIBRARY_MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB
@@ -318,12 +334,10 @@ PLATFORM_CREDENTIALS_FROM_ENV = {
     },
     # Bluesky - session-based auth (app passwords), no app-level credentials needed
     "bluesky": {},
-    # Mastodon - instance-specific OAuth; env vars only work for single-instance deployments
-    "mastodon": {
-        "instance_url": env("PLATFORM_MASTODON_INSTANCE_URL", default=""),
-        "client_id": env("PLATFORM_MASTODON_CLIENT_ID", default=""),
-        "client_secret": env("PLATFORM_MASTODON_CLIENT_SECRET", default=""),
-    },
+    # Mastodon - instance-specific OAuth; credentials are registered per-instance
+    # on first connect and persisted in MastodonAppRegistration. No repo-wide
+    # credentials apply.
+    "mastodon": {},
 }
 
 # Webhook verification

@@ -6,7 +6,9 @@ Handles OAuth flows, account listing, connect/reconnect/disconnect actions.
 import logging
 import secrets
 from datetime import timedelta
+from urllib.parse import urlsplit
 
+from csp.decorators import csp_update
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -21,7 +23,7 @@ from apps.common.validators import is_safe_url as _is_safe_url
 from apps.credentials.models import PlatformCredential
 from apps.members.decorators import require_permission
 
-from .models import MastodonAppRegistration, SocialAccount
+from .models import MastodonAppRegistration, PlatformVisibility, SocialAccount
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +49,20 @@ def _get_provider_for_platform(platform: str, org_id, **extra_credentials):
     return get_provider(platform, credentials)
 
 
+def _get_visible_platform_choices():
+    """Return PlatformCredential.Platform.choices filtered to visible platforms.
+
+    Platforms without a PlatformVisibility row default to visible.
+    """
+    hidden = set(PlatformVisibility.objects.filter(is_visible=False).values_list("platform", flat=True))
+    return [(value, label) for value, label in PlatformCredential.Platform.choices if value not in hidden]
+
+
 def _get_configured_platforms(org_id):
     """Return set of platform names that have credentials configured."""
+    from providers import PROVIDER_REGISTRY
+    from providers.types import AuthType
+
     configured = set(
         PlatformCredential.objects.for_org(org_id).filter(is_configured=True).values_list("platform", flat=True)
     )
@@ -56,6 +70,16 @@ def _get_configured_platforms(org_id):
     for platform, creds in env_creds.items():
         if any(v for v in creds.values()):
             configured.add(platform)
+
+    # Session-auth platforms (e.g. Bluesky) don't need app-level credentials —
+    # the user supplies their own handle + app password at connect time.
+    # Instance-OAuth platforms (e.g. Mastodon) don't need them either —
+    # we register a per-instance OAuth app on first connect and persist it in
+    # MastodonAppRegistration.
+    for platform, provider_cls in PROVIDER_REGISTRY.items():
+        if provider_cls().auth_type in (AuthType.SESSION, AuthType.INSTANCE_OAUTH):
+            configured.add(platform)
+
     return configured
 
 
@@ -86,6 +110,58 @@ def _unsign_state(state_str):
         salt="social-oauth-state",
         max_age=OAUTH_STATE_MAX_AGE,
     )
+
+
+def _normalize_mastodon_instance_url(raw):
+    """Normalize user-supplied Mastodon instance input to `scheme://host[:port]`.
+
+    Accepts: bare hosts (`mastodon.social`), URLs with paths (`https://mastodon.social/@user`),
+    fediverse handles (`@user@mastodon.social`, `user@mastodon.social`), and values with
+    extra whitespace or trailing slashes. Defaults the scheme to https when missing.
+    Returns an empty string when the input has no host.
+    """
+    value = (raw or "").strip()
+    if not value:
+        return ""
+
+    # Fediverse handle form: `@user@host` or `user@host`. If there's exactly one '@'
+    # and no scheme, treat it as a handle and extract the host. Two '@'s means a
+    # leading '@' plus user@host.
+    if "://" not in value and "@" in value:
+        parts = value.lstrip("@").split("@")
+        if len(parts) == 2 and parts[1]:
+            value = parts[1]
+
+    if "://" not in value:
+        value = f"https://{value}"
+
+    parts = urlsplit(value)
+    if not parts.netloc:
+        return ""
+    scheme = parts.scheme or "https"
+    return f"{scheme}://{parts.netloc}"
+
+
+def _resolve_mastodon_extra_creds(session_data):
+    """Resolve Mastodon instance-specific credentials from the OAuth session.
+
+    Returns a dict suitable for `_get_provider_for_platform(**extra_creds)`
+    containing `instance_url`, and `client_id`/`client_secret` when a matching
+    `MastodonAppRegistration` exists. Empty dict when no instance_url is set.
+    """
+    extra_creds: dict = {}
+    instance_url = (session_data or {}).get("instance_url", "")
+    if not instance_url:
+        return extra_creds
+
+    extra_creds["instance_url"] = instance_url
+    try:
+        reg = MastodonAppRegistration.objects.get(instance_url=instance_url)
+        extra_creds["client_id"] = reg.client_id
+        extra_creds["client_secret"] = reg.client_secret
+    except MastodonAppRegistration.DoesNotExist:
+        pass
+    return extra_creds
 
 
 # ------------------------------------------------------------------
@@ -122,12 +198,16 @@ def account_list(request, workspace_id):
 # ------------------------------------------------------------------
 
 
+@csp_update(
+    FORM_ACTION="'self' https://accounts.google.com https://www.facebook.com https://api.instagram.com https://www.instagram.com https://threads.net https://www.linkedin.com https://www.pinterest.com https://www.tiktok.com"
+)
 @login_required
 @require_permission("manage_social_accounts")
 @ratelimit(key="user", rate="20/m", method="POST", block=True)
 def connect_platform(request, workspace_id):
     """GET: show platform grid. POST: initiate OAuth flow."""
     configured_platforms = _get_configured_platforms(request.org.id)
+    visible_platform_choices = _get_visible_platform_choices()
 
     if request.method == "GET":
         return render(
@@ -135,15 +215,15 @@ def connect_platform(request, workspace_id):
             "social_accounts/connect.html",
             {
                 "workspace_id": workspace_id,
-                "platform_choices": PlatformCredential.Platform.choices,
+                "platform_choices": visible_platform_choices,
                 "configured_platforms": configured_platforms,
             },
         )
 
     # POST: initiate OAuth
     platform = request.POST.get("platform", "").strip()
-    if platform not in dict(PlatformCredential.Platform.choices):
-        messages.error(request, "Invalid platform selected.")
+    if platform not in dict(visible_platform_choices):
+        messages.error(request, "This platform is not available.")
         return redirect("social_accounts:connect", workspace_id=workspace_id)
 
     if platform not in configured_platforms:
@@ -241,15 +321,7 @@ def oauth_callback(request, platform):
         # For Mastodon, we need instance-specific credentials from session + registration
         extra_creds: dict = {}
         if platform == PlatformCredential.Platform.MASTODON:
-            instance_url = session_data.get("instance_url", "")
-            if instance_url:
-                extra_creds["instance_url"] = instance_url
-                try:
-                    reg = MastodonAppRegistration.objects.get(instance_url=instance_url)
-                    extra_creds["client_id"] = reg.client_id
-                    extra_creds["client_secret"] = reg.client_secret
-                except MastodonAppRegistration.DoesNotExist:
-                    pass
+            extra_creds = _resolve_mastodon_extra_creds(session_data)
 
         provider = _get_provider_for_platform(platform, request.org.id, **extra_creds)
         redirect_uri = _build_redirect_uri(request, platform)
@@ -294,6 +366,7 @@ def oauth_callback(request, platform):
             access_token=tokens.access_token,
             refresh_token=tokens.refresh_token,
             expires_in=tokens.expires_in,
+            instance_url=extra_creds.get("instance_url", ""),
         )
         messages.success(request, f"Connected {profile.name} successfully.")
 
@@ -399,7 +472,7 @@ def connect_bluesky(request, workspace_id):
             {"workspace_id": workspace_id},
         )
 
-    handle = request.POST.get("handle", "").strip()
+    handle = request.POST.get("handle", "").strip().lstrip("@")
     app_password = request.POST.get("app_password", "").strip()
 
     if not handle or not app_password:
@@ -446,6 +519,7 @@ def connect_bluesky(request, workspace_id):
 # ------------------------------------------------------------------
 
 
+@csp_update(FORM_ACTION="'self' https:")
 @login_required
 @require_permission("manage_social_accounts")
 def connect_mastodon(request, workspace_id):
@@ -457,7 +531,7 @@ def connect_mastodon(request, workspace_id):
             {"workspace_id": workspace_id},
         )
 
-    instance_url = request.POST.get("instance_url", "").strip().rstrip("/")
+    instance_url = _normalize_mastodon_instance_url(request.POST.get("instance_url", ""))
     if not instance_url:
         messages.error(request, "Instance URL is required.")
         return render(
@@ -465,10 +539,6 @@ def connect_mastodon(request, workspace_id):
             "social_accounts/mastodon_connect.html",
             {"workspace_id": workspace_id},
         )
-
-    # Normalize URL
-    if not instance_url.startswith(("http://", "https://")):
-        instance_url = f"https://{instance_url}"
 
     # Validate against SSRF - reject private/reserved IP ranges
     if not _is_safe_url(instance_url):
@@ -547,6 +617,9 @@ def connect_mastodon(request, workspace_id):
 # ------------------------------------------------------------------
 
 
+@csp_update(
+    FORM_ACTION="'self' https://accounts.google.com https://www.facebook.com https://api.instagram.com https://www.instagram.com https://threads.net https://www.linkedin.com https://www.pinterest.com https://www.tiktok.com"
+)
 @login_required
 @require_permission("manage_social_accounts")
 @require_POST
@@ -615,7 +688,7 @@ def disconnect(request, workspace_id, account_id):
     if orphan_post_ids:
         Post.objects.filter(id__in=orphan_post_ids).delete()
 
-    account_name = account.account_name
+    account_name = account.account_name or account.account_handle
     account.delete()
 
     messages.success(request, f"Disconnected {account_name}.")

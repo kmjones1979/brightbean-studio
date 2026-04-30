@@ -28,6 +28,8 @@ urlpatterns = [
     path("workspace/<uuid:workspace_id>/settings/clients/", include("apps.client_portal.urls_admin")),
     # Media Library
     path("workspace/<uuid:workspace_id>/media/", include("apps.media_library.urls")),
+    # GTM Planning (Phase 1)
+    path("workspace/<uuid:workspace_id>/gtm/", include("apps.gtm.urls")),
     path("approvals/org/", org_approval_queue, name="org_approval_queue"),
     # Client Portal (Stream F)
     path("portal/", include("apps.client_portal.urls")),

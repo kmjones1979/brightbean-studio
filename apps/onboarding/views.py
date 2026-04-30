@@ -8,6 +8,7 @@ import logging
 import secrets
 from datetime import timedelta
 
+from csp.decorators import csp_update
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -30,6 +31,8 @@ from apps.social_accounts.views import (
     _create_or_update_account,
     _get_configured_platforms,
     _get_provider_for_platform,
+    _normalize_mastodon_instance_url,
+    _resolve_mastodon_extra_creds,
 )
 
 from .models import ConnectionLink, ConnectionLinkUsage, OnboardingChecklist
@@ -265,6 +268,9 @@ def connection_page(request, token):
     )
 
 
+@csp_update(
+    FORM_ACTION="'self' https://accounts.google.com https://www.facebook.com https://api.instagram.com https://www.instagram.com https://threads.net https://www.linkedin.com https://www.pinterest.com https://www.tiktok.com"
+)
 @require_POST
 def connection_oauth_start(request, token):
     """Initiate OAuth flow from the connection link page."""
@@ -384,7 +390,11 @@ def connection_oauth_callback(request, platform):
     org = link.workspace.organization
 
     try:
-        provider = _get_provider_for_platform(platform, org.id)
+        extra_creds: dict = {}
+        if platform == PlatformCredential.Platform.MASTODON:
+            extra_creds = _resolve_mastodon_extra_creds(session_data)
+
+        provider = _get_provider_for_platform(platform, org.id, **extra_creds)
         redirect_uri = _build_connection_redirect_uri(request, platform)
         tokens = provider.exchange_code(code, redirect_uri)
         profile = provider.get_profile(tokens.access_token)
@@ -428,6 +438,7 @@ def connection_oauth_callback(request, platform):
             access_token=tokens.access_token,
             refresh_token=tokens.refresh_token,
             expires_in=tokens.expires_in,
+            instance_url=extra_creds.get("instance_url", ""),
         )
         ConnectionLinkUsage.objects.get_or_create(
             connection_link=link,
@@ -534,6 +545,7 @@ def connection_bluesky_connect(request, token):
     return redirect("onboarding:connection_page", token=token)
 
 
+@csp_update(FORM_ACTION="'self' https:")
 @require_POST
 def connection_mastodon_start(request, token):
     """Initiate Mastodon OAuth from the connection link page."""
@@ -541,13 +553,10 @@ def connection_mastodon_start(request, token):
     if not link or not link.is_active:
         return render(request, "onboarding/connection_expired.html", status=400)
 
-    instance_url = request.POST.get("instance_url", "").strip().rstrip("/")
+    instance_url = _normalize_mastodon_instance_url(request.POST.get("instance_url", ""))
     if not instance_url:
         request.session["connection_link_error"] = "Instance URL is required."
         return redirect("onboarding:connection_page", token=token)
-
-    if not instance_url.startswith(("http://", "https://")):
-        instance_url = f"https://{instance_url}"
 
     org = link.workspace.organization
 
