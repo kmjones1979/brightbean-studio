@@ -39,8 +39,50 @@
         {% if active_tab == "history" %}
             {% include "gtm/partials/history.html" %}
         {% elif active_tab == "generations" %}
-            <div class="text-sm text-stone-500 italic">
-                AI generations using this plan will appear here once Phase 2 is shipped.
+            <div class="border border-stone-200 rounded-lg bg-white overflow-hidden">
+                {% if generations %}
+                    <table class="w-full text-sm">
+                        <thead class="bg-stone-50 text-stone-600 text-xs uppercase">
+                            <tr>
+                                <th class="text-left px-4 py-2">When</th>
+                                <th class="text-left px-4 py-2">Kind</th>
+                                <th class="text-left px-4 py-2">Provider</th>
+                                <th class="text-left px-4 py-2">Status</th>
+                                <th class="text-left px-4 py-2">Actor</th>
+                                <th class="text-right px-4 py-2">Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-stone-200">
+                            {% for gen in generations %}
+                                <tr class="hover:bg-stone-50">
+                                    <td class="px-4 py-2 text-stone-600 text-xs">{{ gen.created_at|date:"M j H:i" }}</td>
+                                    <td class="px-4 py-2 font-mono text-xs">{{ gen.kind }}</td>
+                                    <td class="px-4 py-2 text-xs">
+                                        {{ gen.provider|default:"—" }}
+                                        {% if gen.routed_via_shroud %} <span class="text-stone-400">via Shroud</span>{% endif %}
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs
+                                            {% if gen.status == 'succeeded' %}bg-green-100 text-green-700
+                                            {% elif gen.status == 'failed' %}bg-red-100 text-red-700
+                                            {% elif gen.status == 'blocked_by_shroud' %}bg-amber-100 text-amber-700
+                                            {% else %}bg-stone-100 text-stone-700{% endif %}">
+                                            {{ gen.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-2 text-xs text-stone-600">{{ gen.actor.email|default:"system" }}</td>
+                                    <td class="px-4 py-2 text-right text-xs font-mono">${{ gen.cost_usd|floatformat:4 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-sm text-stone-500 p-6 text-center">
+                        No AI generations yet have referenced this plan.
+                        <a href="{% url 'ai:generate_panel' workspace_id=workspace.id %}?gtm_plan_id={{ plan.id }}"
+                           class="text-primary hover:underline">Compose with AI →</a>
+                    </p>
+                {% endif %}
             </div>
         {% else %}
             {% include "gtm/partials/section_view.html" with section=active_tab %}

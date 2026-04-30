@@ -49,6 +49,9 @@ def settings_page(request, workspace_id):
 
     recent_generations = AIGeneration.objects.for_workspace(workspace.id).order_by("-created_at")[:10]
 
+    # Daily spend series for the current month (for the sparkline)
+    daily_spend = _daily_spend_series(workspace, config.spend_window_start)
+
     return render(
         request,
         "ai/settings.html",
@@ -61,8 +64,46 @@ def settings_page(request, workspace_id):
             "spend_pct": (int((spend_usd / cap_usd) * 100) if cap_usd > 0 else 0),
             "available_models": known_models(),
             "recent_generations": recent_generations,
+            "daily_spend_json": json.dumps(daily_spend),
         },
     )
+
+
+def _daily_spend_series(workspace, window_start) -> list[dict]:
+    """Return [{day: 'M j', cost_usd: float}] for each day from window_start to today."""
+    from datetime import date, datetime, timedelta
+
+    from django.db.models import Sum
+    from django.utils import timezone
+
+    today = timezone.now().date()
+    start = window_start
+    if isinstance(start, datetime):
+        start = start.date()
+    if not isinstance(start, date):
+        start = today.replace(day=1)
+
+    by_day = (
+        AIGeneration.objects.for_workspace(workspace.id)
+        .filter(created_at__date__gte=start, created_at__date__lte=today)
+        .extra(select={"day": "DATE(created_at)"})
+        .values("day")
+        .annotate(total=Sum("cost_usd_micro"))
+    )
+    map_ = {row["day"]: row["total"] or 0 for row in by_day}
+
+    series = []
+    cur = start
+    while cur <= today:
+        micro = map_.get(cur, 0)
+        series.append(
+            {
+                "day": cur.strftime("%-m/%-d"),
+                "cost_usd": float(micro) / 1_000_000.0,
+            }
+        )
+        cur += timedelta(days=1)
+    return series
 
 
 # ---------------------------------------------------------------------------

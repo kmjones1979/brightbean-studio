@@ -107,12 +107,26 @@ def plan_detail(request: HttpRequest, workspace_id, plan_id):
     if active_tab not in dict(PLAN_TABS):
         active_tab = "overview"
 
+    generations = []
+    if active_tab == "generations":
+        try:
+            from apps.ai.models import AIGeneration
+
+            generations = (
+                AIGeneration.objects.filter(workspace=workspace, gtm_plan=plan)
+                .select_related("actor")
+                .order_by("-created_at")[:50]
+            )
+        except ImportError:
+            generations = []
+
     context = {
         "workspace": workspace,
         "plan": plan,
         "active_tab": active_tab,
         "tab_list": PLAN_TABS,
         "status_choices": GTMPlanStatus.choices,
+        "generations": generations,
     }
     return render(request, "gtm/plan_detail.html", context)
 
