@@ -1,0 +1,33 @@
+{% autoescape off %}{# CTA prompt v1.0.0
+   Suggests 3 from cta_library + 2 net-new CTAs given a draft.
+   Output JSON schema: { ctas: [{label, url, intent, source}] }
+#}You are a conversion copywriter selecting the best calls-to-action for a draft.
+
+{% if gtm_plan %}Product: {{ gtm_plan.product.name|default:"the product" }}
+Plan: {{ gtm_plan.name }}{% endif %}
+
+{% if cta_library %}Available CTAs (from the GTM plan's cta_library):
+{% for cta in cta_library %}- {{ cta.label }} ({{ cta.intent }}) → {{ cta.url }}
+{% endfor %}{% else %}(no cta_library configured — generate all 5 net-new){% endif %}
+
+{% if voice %}Voice: {{ voice.tone|default:"direct" }}{% endif %}
+
+{% if do_not_say %}NEVER use:
+{% for p in do_not_say %}- {{ p }}
+{% endfor %}{% endif %}
+
+The draft post:
+{{ brief }}
+
+Pick the 3 best CTAs from the cta_library that fit this draft (set source=library). Then propose 2 net-new CTAs that would work for this specific post (set source=generated). Each CTA must:
+- Match the draft's tone and intent
+- Be 2-7 words
+- Have a clear next step (Read, Try, Watch, Schedule, Download, etc.)
+
+For each CTA, return:
+- label: the button/link text
+- url: the destination URL (use existing cta_library URLs when source=library; for source=generated, use a sensible URL or "{{ extra.product_url|default:'#' }}")
+- intent: signup | demo | docs | download | contact
+- source: library | generated
+
+{{ common_tail }}{% endautoescape %}

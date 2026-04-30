@@ -26,11 +26,15 @@ COMMON_TAIL = (
 
 
 def _read_template(name: str) -> str:
-    """Read the raw template and disable HTML autoescape — these prompts are
-    fed to LLMs, not rendered as HTML, so apostrophes must stay literal.
+    """Read the raw template. Templates wrap their own bodies in
+    `{% autoescape off %}` so apostrophes etc. stay literal — these prompts
+    are fed to LLMs, not rendered as HTML.
     """
     path = PROMPTS_DIR / f"{name}.txt"
-    return "{% autoescape off %}" + path.read_text(encoding="utf-8") + "{% endautoescape %}"
+    text = path.read_text(encoding="utf-8")
+    if "{% autoescape" not in text:
+        text = "{% autoescape off %}" + text + "{% endautoescape %}"
+    return text
 
 
 def render_prompt(
@@ -117,6 +121,129 @@ SCHEMAS: dict[str, dict] = {
                         "char_count": {"type": "integer"},
                         "hashtags": {"type": "array", "items": {"type": "string"}},
                         "first_comment": {"type": "string"},
+                    },
+                },
+            }
+        },
+    },
+    "hook": {
+        "type": "object",
+        "required": ["hooks"],
+        "properties": {
+            "hooks": {
+                "type": "array",
+                "minItems": 5,
+                "maxItems": 5,
+                "items": {
+                    "type": "object",
+                    "required": ["text", "style", "rationale"],
+                    "properties": {
+                        "text": {"type": "string"},
+                        "style": {
+                            "type": "string",
+                            "enum": ["stat", "contrarian", "challenge", "observation", "comparison"],
+                        },
+                        "rationale": {"type": "string"},
+                    },
+                },
+            }
+        },
+    },
+    "cta": {
+        "type": "object",
+        "required": ["ctas"],
+        "properties": {
+            "ctas": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["label", "url", "intent", "source"],
+                    "properties": {
+                        "label": {"type": "string"},
+                        "url": {"type": "string"},
+                        "intent": {
+                            "type": "string",
+                            "enum": ["signup", "demo", "docs", "download", "contact"],
+                        },
+                        "source": {"type": "string", "enum": ["library", "generated"]},
+                    },
+                },
+            }
+        },
+    },
+    "hashtags": {
+        "type": "object",
+        "required": ["broad", "niche", "branded"],
+        "properties": {
+            "broad": {"type": "array", "items": {"type": "string"}},
+            "niche": {"type": "array", "items": {"type": "string"}},
+            "branded": {"type": "array", "items": {"type": "string"}},
+        },
+    },
+    "brief_expand": {
+        "type": "object",
+        "required": [
+            "headline",
+            "angle",
+            "key_points",
+            "cta_suggestion",
+            "target_audience",
+            "distribution",
+        ],
+        "properties": {
+            "headline": {"type": "string"},
+            "angle": {"type": "string"},
+            "key_points": {"type": "array", "items": {"type": "string"}},
+            "cta_suggestion": {"type": "string"},
+            "target_audience": {"type": "string"},
+            "distribution": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["platform", "reason"],
+                    "properties": {
+                        "platform": {"type": "string"},
+                        "reason": {"type": "string"},
+                    },
+                },
+            },
+        },
+    },
+    "idea_seed": {
+        "type": "object",
+        "required": ["ideas"],
+        "properties": {
+            "ideas": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["title", "description", "target_audience", "suggested_platforms"],
+                    "properties": {
+                        "title": {"type": "string"},
+                        "description": {"type": "string"},
+                        "target_audience": {"type": "string"},
+                        "cta": {"type": "string"},
+                        "suggested_platforms": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            }
+        },
+    },
+    "reply_draft": {
+        "type": "object",
+        "required": ["replies"],
+        "properties": {
+            "replies": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                    "type": "object",
+                    "required": ["text", "style", "length"],
+                    "properties": {
+                        "text": {"type": "string"},
+                        "style": {"type": "string", "enum": ["short", "with_cta"]},
+                        "length": {"type": "integer"},
                     },
                 },
             }

@@ -19,6 +19,7 @@ Renders one of:
         </div>
 
         {% if parsed.variants %}
+            {# caption / multi_platform #}
             {% for v in parsed.variants %}
                 <div class="border border-stone-200 rounded-lg p-4 bg-white">
                     <div class="flex items-center justify-between mb-2">
@@ -44,6 +45,117 @@ Renders one of:
                     {% if v.rationale %}
                         <p class="text-xs text-stone-400 mt-2">{{ v.rationale }}</p>
                     {% endif %}
+                </div>
+            {% endfor %}
+        {% elif parsed.hooks %}
+            {# hooks #}
+            {% for h in parsed.hooks %}
+                <div class="border border-stone-200 rounded-lg p-4 bg-white">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-stone-500 uppercase">{{ h.style }}</span>
+                        <button onclick="navigator.clipboard.writeText(this.dataset.copy)"
+                                data-copy="{{ h.text|escape }}"
+                                class="text-xs px-2 py-1 rounded border border-stone-200 hover:bg-stone-50">Copy</button>
+                    </div>
+                    <p class="text-sm text-stone-900">{{ h.text }}</p>
+                    <p class="text-xs text-stone-400 mt-1">{{ h.rationale }}</p>
+                </div>
+            {% endfor %}
+        {% elif parsed.ctas %}
+            {# cta #}
+            <div class="grid sm:grid-cols-2 gap-3">
+                {% for c in parsed.ctas %}
+                    <div class="border border-stone-200 rounded-lg p-4 bg-white">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-stone-500">{{ c.intent }} · {{ c.source }}</span>
+                            <button onclick="navigator.clipboard.writeText(this.dataset.copy)"
+                                    data-copy="{{ c.label }} → {{ c.url }}"
+                                    class="text-xs px-2 py-1 rounded border border-stone-200 hover:bg-stone-50">Copy</button>
+                        </div>
+                        <p class="text-sm font-semibold text-stone-900">{{ c.label }}</p>
+                        <a href="{{ c.url }}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline break-all">{{ c.url }}</a>
+                    </div>
+                {% endfor %}
+            </div>
+        {% elif parsed.broad or parsed.niche or parsed.branded %}
+            {# hashtags #}
+            <div class="grid grid-cols-3 gap-3">
+                {% for tier_label, tier_tags in parsed_tiers %}
+                    <div class="border border-stone-200 rounded-lg p-4 bg-white">
+                        <p class="text-xs font-semibold text-stone-700 uppercase mb-2">{{ tier_label }}</p>
+                        <div class="flex flex-wrap gap-1">
+                            {% for t in tier_tags %}
+                                <span class="text-xs px-2 py-1 rounded-full bg-stone-100 text-stone-700">#{{ t }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% elif parsed.headline %}
+            {# brief_expand #}
+            <div class="border border-stone-200 rounded-lg p-5 bg-white space-y-3">
+                <div>
+                    <p class="text-xs uppercase text-stone-500 mb-1">Headline</p>
+                    <p class="text-base font-semibold text-stone-900">{{ parsed.headline }}</p>
+                </div>
+                <div>
+                    <p class="text-xs uppercase text-stone-500 mb-1">Angle</p>
+                    <p class="text-sm text-stone-800">{{ parsed.angle }}</p>
+                </div>
+                <div>
+                    <p class="text-xs uppercase text-stone-500 mb-1">Key points</p>
+                    <ul class="text-sm text-stone-800 list-disc ml-5 space-y-1">
+                        {% for k in parsed.key_points %}<li>{{ k }}</li>{% endfor %}
+                    </ul>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <p class="text-stone-500 uppercase mb-1">CTA</p>
+                        <p class="text-stone-800">{{ parsed.cta_suggestion }}</p>
+                    </div>
+                    <div>
+                        <p class="text-stone-500 uppercase mb-1">Audience</p>
+                        <p class="text-stone-800">{{ parsed.target_audience }}</p>
+                    </div>
+                </div>
+                {% if parsed.distribution %}
+                <div>
+                    <p class="text-xs uppercase text-stone-500 mb-1">Distribution</p>
+                    <ul class="text-sm text-stone-800 space-y-1">
+                        {% for d in parsed.distribution %}
+                            <li><strong>{{ d.platform }}</strong> — <span class="text-stone-600">{{ d.reason }}</span></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        {% elif parsed.ideas %}
+            {# idea_seed #}
+            <div class="grid sm:grid-cols-2 gap-3">
+                {% for idea in parsed.ideas %}
+                    <div class="border border-stone-200 rounded-lg p-4 bg-white">
+                        <p class="text-sm font-semibold text-stone-900 mb-1">{{ idea.title }}</p>
+                        <p class="text-xs text-stone-600 mb-2">{{ idea.description }}</p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            {% for p in idea.suggested_platforms %}
+                                <span class="text-[10px] uppercase px-1.5 py-0.5 rounded bg-stone-100 text-stone-600">{{ p }}</span>
+                            {% endfor %}
+                        </div>
+                        <p class="text-xs text-stone-500">→ {{ idea.target_audience }}{% if idea.cta %} · {{ idea.cta }}{% endif %}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% elif parsed.replies %}
+            {# reply_draft #}
+            {% for r in parsed.replies %}
+                <div class="border border-stone-200 rounded-lg p-4 bg-white">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs uppercase text-stone-500">{{ r.style }} · {{ r.length }} chars</span>
+                        <button onclick="navigator.clipboard.writeText(this.dataset.copy)"
+                                data-copy="{{ r.text|escape }}"
+                                class="text-xs px-2 py-1 rounded border border-stone-200 hover:bg-stone-50">Copy</button>
+                    </div>
+                    <p class="text-sm text-stone-900 whitespace-pre-wrap">{{ r.text }}</p>
                 </div>
             {% endfor %}
         {% else %}

@@ -4,27 +4,25 @@ in the composer. Always-expanded by design; AI-first defaults.
 Context: workspace, plans, selected_plan_id, platform_specs, default_platform
 {% endcomment %}
 
+{% with kinds_with_form="caption,multi_platform,hooks,cta,hashtags,brief_expand,idea_seed" %}
 <div x-data="{ kind: 'caption', platforms: ['twitter','linkedin_personal'] }"
      class="space-y-4 border border-stone-200 rounded-lg p-5 bg-white">
 
     <!-- Mode switcher -->
-    <div class="flex gap-2 border-b border-stone-200 pb-3 -mx-5 px-5">
-        <button @click="kind='caption'"
-                :class="kind==='caption' ? 'bg-primary text-white' : 'bg-stone-50 text-stone-700 hover:bg-stone-100'"
-                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors">
-            Single platform
-        </button>
-        <button @click="kind='multi_platform'"
-                :class="kind==='multi_platform' ? 'bg-primary text-white' : 'bg-stone-50 text-stone-700 hover:bg-stone-100'"
-                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors">
-            Multi-platform
-        </button>
+    <div class="flex flex-wrap gap-1.5 border-b border-stone-200 pb-3 -mx-5 px-5">
+        {% for slug, label in kind_modes %}
+            <button @click="kind='{{ slug }}'"
+                    :class="kind==='{{ slug }}' ? 'bg-primary text-white' : 'bg-stone-50 text-stone-700 hover:bg-stone-100'"
+                    class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors">
+                {{ label }}
+            </button>
+        {% endfor %}
     </div>
 
     <!-- GTM plan + brief (shared across modes) -->
     <div>
         <label class="block text-xs font-medium text-stone-600 mb-1">GTM plan</label>
-        <select name="gtm_plan_id" form="ai-generate-form"
+        <select name="gtm_plan_id" x-bind:form="'ai-form-'+kind"
                 class="w-full px-3 py-2 rounded-lg border border-stone-200 text-sm">
             <option value="">— No GTM plan —</option>
             {% for plan in plans %}
@@ -41,12 +39,11 @@ Context: workspace, plans, selected_plan_id, platform_specs, default_platform
         {% endif %}
     </div>
 
-    <div>
+    <div x-show="kind !== 'reply_draft'">
         <label class="block text-xs font-medium text-stone-600 mb-1">What's this post about?</label>
         <textarea name="brief"
-                  form="ai-generate-form"
+                  x-bind:form="'ai-form-'+kind"
                   rows="3"
-                  required
                   placeholder="One sentence is fine — e.g., 'Announce that our MCP server now supports Cursor.'"
                   class="w-full px-3 py-2 rounded-lg border border-stone-200 text-sm font-sans"></textarea>
     </div>
@@ -55,8 +52,7 @@ Context: workspace, plans, selected_plan_id, platform_specs, default_platform
     <div x-show="kind === 'caption'" x-cloak class="space-y-3">
         <div>
             <label class="block text-xs font-medium text-stone-600 mb-1">Platform</label>
-            <select name="platform"
-                    form="ai-generate-form"
+            <select name="platform" form="ai-form-caption"
                     class="w-full px-3 py-2 rounded-lg border border-stone-200 text-sm">
                 {% for slug, spec in platform_specs.items %}
                     <option value="{{ slug }}" {% if slug == default_platform %}selected{% endif %}>
@@ -65,14 +61,11 @@ Context: workspace, plans, selected_plan_id, platform_specs, default_platform
                 {% endfor %}
             </select>
         </div>
-        <form id="ai-generate-form"
+        <form id="ai-form-caption"
               hx-post="{% url 'ai:generate_caption' workspace_id=workspace.id %}"
-              hx-target="#ai-result"
-              hx-swap="innerHTML"
-              x-show="kind==='caption'">
+              hx-target="#ai-result" hx-swap="innerHTML">
             {% csrf_token %}
-            <button type="submit"
-                    class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover transition-colors">
+            <button type="submit" class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover">
                 Generate 3 caption variants →
             </button>
         </form>
@@ -85,28 +78,93 @@ Context: workspace, plans, selected_plan_id, platform_specs, default_platform
             <div class="grid grid-cols-2 gap-2">
                 {% for slug, spec in platform_specs.items %}
                     <label class="flex items-center gap-2 px-3 py-2 rounded-lg border border-stone-200 cursor-pointer hover:bg-stone-50">
-                        <input type="checkbox" name="platforms[]" value="{{ slug }}"
-                               x-model="platforms"
-                               form="ai-multi-form"
-                               class="h-4 w-4 text-primary">
+                        <input type="checkbox" name="platforms[]" value="{{ slug }}" x-model="platforms" form="ai-form-multi_platform" class="h-4 w-4 text-primary">
                         <span class="text-sm">{{ spec.label }}</span>
                     </label>
                 {% endfor %}
             </div>
         </div>
-        <form id="ai-multi-form"
+        <form id="ai-form-multi_platform"
               hx-post="{% url 'ai:generate_multi_platform' workspace_id=workspace.id %}"
-              hx-target="#ai-result"
-              hx-swap="innerHTML">
+              hx-target="#ai-result" hx-swap="innerHTML">
             {% csrf_token %}
-            <button type="submit"
-                    :disabled="platforms.length === 0"
-                    class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            <button type="submit" :disabled="platforms.length === 0"
+                    class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-50">
                 Generate one variant per platform →
             </button>
         </form>
     </div>
+
+    <!-- Hooks -->
+    <form x-show="kind === 'hooks'" x-cloak id="ai-form-hooks"
+          hx-post="{% url 'ai:generate_hooks' workspace_id=workspace.id %}"
+          hx-target="#ai-result" hx-swap="innerHTML">
+        {% csrf_token %}
+        <button type="submit" class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover">
+            Generate 5 opening hooks →
+        </button>
+    </form>
+
+    <!-- CTA -->
+    <form x-show="kind === 'cta'" x-cloak id="ai-form-cta"
+          hx-post="{% url 'ai:generate_cta' workspace_id=workspace.id %}"
+          hx-target="#ai-result" hx-swap="innerHTML">
+        {% csrf_token %}
+        <p class="text-xs text-stone-500 mb-2">Paste your draft post in the brief above. CTA picks 3 from the GTM plan + 2 net-new.</p>
+        <button type="submit" class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover">
+            Suggest 5 CTAs →
+        </button>
+    </form>
+
+    <!-- Hashtags -->
+    <div x-show="kind === 'hashtags'" x-cloak class="space-y-3">
+        <div>
+            <label class="block text-xs font-medium text-stone-600 mb-1">Platform</label>
+            <select name="platform" form="ai-form-hashtags" class="w-full px-3 py-2 rounded-lg border border-stone-200 text-sm">
+                {% for slug, spec in platform_specs.items %}
+                    <option value="{{ slug }}" {% if slug == default_platform %}selected{% endif %}>{{ spec.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <form id="ai-form-hashtags"
+              hx-post="{% url 'ai:generate_hashtags' workspace_id=workspace.id %}"
+              hx-target="#ai-result" hx-swap="innerHTML">
+            {% csrf_token %}
+            <button type="submit" class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover">
+                Generate tiered hashtags →
+            </button>
+        </form>
+    </div>
+
+    <!-- Brief expand -->
+    <form x-show="kind === 'brief_expand'" x-cloak id="ai-form-brief_expand"
+          hx-post="{% url 'ai:generate_brief_expand' workspace_id=workspace.id %}"
+          hx-target="#ai-result" hx-swap="innerHTML">
+        {% csrf_token %}
+        <button type="submit" class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover">
+            Expand into a structured brief →
+        </button>
+    </form>
+
+    <!-- Idea seed -->
+    <div x-show="kind === 'idea_seed'" x-cloak class="space-y-3">
+        <div>
+            <label class="block text-xs font-medium text-stone-600 mb-1">How many ideas?</label>
+            <input type="number" name="count" value="8" min="1" max="20" form="ai-form-idea_seed"
+                   class="w-full px-3 py-2 rounded-lg border border-stone-200 text-sm">
+        </div>
+        <form id="ai-form-idea_seed"
+              hx-post="{% url 'ai:generate_idea_seed' workspace_id=workspace.id %}"
+              hx-target="#ai-result" hx-swap="innerHTML">
+            {% csrf_token %}
+            <p class="text-xs text-stone-500 mb-2">Brief is optional — omit it to seed broadly from the GTM plan.</p>
+            <button type="submit" class="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-hover">
+                Seed ideas from GTM plan →
+            </button>
+        </form>
+    </div>
 </div>
+{% endwith %}
 
 <!-- Result region -->
 <div id="ai-result" class="mt-6"></div>

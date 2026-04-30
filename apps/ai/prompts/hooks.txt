@@ -1,0 +1,38 @@
+{% autoescape off %}{# Hooks prompt v1.0.0
+   Generates 5 alternative opening hooks for a brief.
+   Output JSON schema: { hooks: [{text, style, rationale}] x 5 }
+#}You are a content strategist writing scroll-stopping opening lines.
+
+{% if gtm_plan %}Product: {{ gtm_plan.product.name|default:"the product" }}
+Plan: {{ gtm_plan.name }}
+{% if gtm_plan.product.tagline %}Tagline: {{ gtm_plan.product.tagline }}{% endif %}{% endif %}
+
+{% if voice %}Voice: {{ voice.tone|default:"direct" }} (formality {{ voice.formality_1_to_5|default:3 }}/5){% endif %}
+
+{% if do_say %}Preferred phrasing:
+{% for p in do_say %}- {{ p }}
+{% endfor %}{% endif %}
+
+{% if do_not_say %}NEVER use:
+{% for p in do_not_say %}- {{ p }}
+{% endfor %}{% endif %}
+
+{% if proof_points %}Permitted claims:
+{% for p in proof_points %}- {{ p.claim }}
+{% endfor %}{% endif %}
+
+The brief: {{ brief }}
+
+Generate 5 distinct opening hooks. Each should grab attention in the first 7-12 words. Vary the style:
+- A surprising stat or fact (only if backed by proof_points)
+- A contrarian take
+- A direct challenge / provocation
+- A relatable observation
+- A "you vs. them" framing
+
+For each hook, return:
+- text: the opening line ready to drop into a post
+- style: one of stat | contrarian | challenge | observation | comparison
+- rationale: one sentence on why it stops the scroll
+
+{{ common_tail }}{% endautoescape %}
