@@ -1,37 +1,40 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Bakbak+One&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
 
 /* Scan all template directories for Tailwind class usage */
 @source "../../../templates/**/*.html";
 @source "../../../apps/**/templates/**/*.html";
 
 /* ═══════════════════════════════════════════════════════════════
-   WHITE-LABEL TOKEN ARCHITECTURE
+   WHITE-LABEL TOKEN ARCHITECTURE — 1CLAW SKIN
    Layer 1 → Brand Tokens   (swap these to white-label)
    Layer 2 → Semantic Tokens (reference brand tokens)
    Layer 3 → Component Tokens (reference semantic tokens)
    To rebrand: change ONLY the brand token values below.
+   See https://1claw.xyz/brand-kit for the source palette.
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Brand Tokens - BrightBean Orange */
-  --brand-50:  #FFF7ED;
-  --brand-100: #FFEDD5;
-  --brand-200: #FED7AA;
-  --brand-300: #FDBA74;
-  --brand-400: #FB923C;
-  --brand-500: #F97316;
-  --brand-600: #EA580C;
-  --brand-700: #C2410C;
-  --brand-800: #9A3412;
-  --brand-900: #7C2D12;
+  /* Brand Tokens — 1Claw signature red */
+  --brand-50:  #FFF1F4;
+  --brand-100: #FFE8EC;   /* 1Claw light accent */
+  --brand-200: #FECDD6;
+  --brand-300: #FBA9B7;
+  --brand-400: #F47A8E;
+  --brand-500: #E11D48;
+  --brand-600: #B80030;   /* 1Claw signature dark-mode primary */
+  --brand-700: #99002A;   /* 1Claw light-mode primary */
+  --brand-800: #7A0021;
+  --brand-900: #5F0019;
 
-  --brand-font-display: Georgia, 'Times New Roman', serif;
-  --brand-font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --brand-font-mono: ui-monospace, SFMono-Regular, 'Cascadia Code', 'Consolas', monospace;
+  --brand-font-wordmark: 'Bakbak One', system-ui, sans-serif;
+  --brand-font-display: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --brand-font-body: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --brand-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, 'Cascadia Code', 'Consolas', monospace;
 
-  /* Semantic Tokens */
-  --primary:       var(--brand-500);
-  --primary-hover: var(--brand-600);
+  /* Semantic Tokens — 1Claw uses brand-700 (#990029) as primary in light mode */
+  --primary:       var(--brand-700);
+  --primary-hover: var(--brand-800);
   --primary-soft:  var(--brand-50);
   --primary-muted: var(--brand-100);
   --primary-ring:  var(--brand-200);
@@ -92,7 +95,7 @@
   --shadow-md:  0 4px 6px rgba(23,20,18,0.06), 0 2px 4px rgba(23,20,18,0.04);
   --shadow-lg:  0 10px 15px rgba(23,20,18,0.08), 0 4px 6px rgba(23,20,18,0.04);
   --shadow-xl:  0 20px 25px rgba(23,20,18,0.08), 0 8px 10px rgba(23,20,18,0.04);
-  --shadow-primary: 0 4px 14px rgba(249,115,22,0.28);
+  --shadow-primary: 0 4px 14px rgba(184, 0, 48, 0.28);
 
   /* Radii */
   --radius-sm:   0.25rem;
@@ -121,12 +124,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Auth page background pattern */
+/* Auth page background pattern (1claw red glow) */
 .auth-bg {
   background-color: var(--surface-1);
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(249,115,22,0.08), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(20,184,166,0.04), transparent);
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(184, 0, 48, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(196, 18, 58, 0.04), transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -699,4 +702,24 @@ span.flatpickr-weekday {
 }
 .flatpickr-time .numInputWrapper span.arrowDown::after {
   border-top-color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   1CLAW BRAND UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+
+.font-wordmark {
+  font-family: var(--brand-font-wordmark);
+  letter-spacing: 0.01em;
+}
+
+.brand-gradient {
+  background: linear-gradient(135deg, #b80030 0%, #c4123a 40%, #990029 100%);
+}
+
+.brand-gradient-text {
+  background: linear-gradient(135deg, #b80030 0%, #c4123a 40%, #990029 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
