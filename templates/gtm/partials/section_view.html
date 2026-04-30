@@ -1,0 +1,37 @@
+{% load gtm_extras %}
+{% comment %}
+Renders a single section of a GTM plan in read mode with an Edit button.
+Context: plan, workspace, section (slug)
+{% endcomment %}
+
+{% with editable=request.workspace_membership.workspace_role|stringformat:"s" %}
+<div class="border border-stone-200 rounded-lg p-5 bg-white">
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold text-stone-900">{{ section|title }}</h3>
+        {% if request.workspace_membership.workspace_role != "viewer" and request.workspace_membership.workspace_role != "client" %}
+            <button hx-get="{% url 'gtm:plan_edit_section' workspace_id=workspace.id plan_id=plan.id section=section %}"
+                    hx-target="closest .border"
+                    hx-swap="outerHTML"
+                    class="text-xs px-2 py-1 rounded border border-stone-200 hover:bg-stone-50">
+                Edit
+            </button>
+        {% endif %}
+    </div>
+
+    {% if section == "overview" %}
+        <dl class="grid grid-cols-2 gap-3 text-sm">
+            <dt class="text-stone-500">Name</dt><dd class="text-stone-900">{{ plan.name }}</dd>
+            <dt class="text-stone-500">Status</dt><dd>{{ plan.get_status_display }}</dd>
+            <dt class="text-stone-500">Partner</dt><dd>{{ plan.partner.name }}</dd>
+            <dt class="text-stone-500">Product</dt><dd>{{ plan.product.name|default:"—" }}</dd>
+            <dt class="text-stone-500">Problem/Solution</dt><dd>{{ plan.problem_solution.target_persona|default:"—" }}</dd>
+        </dl>
+    {% elif section == "compliance" %}
+        <pre class="whitespace-pre-wrap text-sm text-stone-700 font-sans">{{ plan.compliance_notes|default:"—" }}</pre>
+    {% else %}
+        {% with value=plan|attr:section %}
+            <pre class="whitespace-pre-wrap text-xs text-stone-700 font-mono bg-stone-50 p-3 rounded border border-stone-100 overflow-x-auto max-h-96">{{ value|safe_json }}</pre>
+        {% endwith %}
+    {% endif %}
+</div>
+{% endwith %}

@@ -1,0 +1,28 @@
+{% comment %}
+History tab: list of revisions for a plan.
+Context: plan, workspace, revisions
+{% endcomment %}
+<div class="border border-stone-200 rounded-lg bg-white overflow-hidden">
+    {% if revisions %}
+        <table class="w-full text-sm">
+            <thead class="bg-stone-50 text-stone-600 text-xs uppercase">
+                <tr>
+                    <th class="text-left px-4 py-2">When</th>
+                    <th class="text-left px-4 py-2">Editor</th>
+                    <th class="text-left px-4 py-2">Change</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-200">
+                {% for rev in revisions %}
+                    <tr>
+                        <td class="px-4 py-2 text-stone-700">{{ rev.created_at|date:"M j, Y H:i" }}</td>
+                        <td class="px-4 py-2 text-stone-600">{{ rev.edited_by.email|default:"—" }}</td>
+                        <td class="px-4 py-2 text-stone-700">{{ rev.diff_summary|default:"—" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="text-sm text-stone-500 p-6 text-center">No revisions yet.</p>
+    {% endif %}
+</div>
