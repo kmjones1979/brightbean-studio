@@ -32,7 +32,61 @@
             Window started {{ config.spend_window_start|date:"M j, Y" }}.
             {% if config.is_over_cap %}<span class="text-red-600 font-medium">Cap reached — generations blocked.</span>{% endif %}
         </p>
+
+        <!-- Sparkline -->
+        <div class="mt-4">
+            <p class="text-xs uppercase font-semibold text-stone-500 mb-2">Daily spend this month</p>
+            <canvas id="spend-sparkline" width="600" height="70" class="w-full max-w-full"></canvas>
+        </div>
     </div>
+
+    <script id="spend-data" type="application/json">{{ daily_spend_json|safe }}</script>
+    <script nonce="{{ request.csp_nonce }}">
+    (function () {
+        var data = JSON.parse(document.getElementById("spend-data").textContent);
+        if (!data.length) return;
+        var canvas = document.getElementById("spend-sparkline");
+        if (!canvas || !canvas.getContext) return;
+        var ctx = canvas.getContext("2d");
+        var w = canvas.width, h = canvas.height;
+        var pad = 20;
+        var values = data.map(function (d) { return d.cost_usd; });
+        var maxV = Math.max.apply(null, values.concat([0.0001]));
+        var n = data.length;
+
+        // Background grid baseline
+        ctx.clearRect(0, 0, w, h);
+        ctx.strokeStyle = "#e7e5e4";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(pad, h - pad);
+        ctx.lineTo(w - pad, h - pad);
+        ctx.stroke();
+
+        // Bars
+        var barW = (w - 2 * pad) / Math.max(n, 1);
+        var primary = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() || "#990029";
+        ctx.fillStyle = primary;
+        for (var i = 0; i < n; i++) {
+            var v = values[i];
+            var bh = (v / maxV) * (h - 2 * pad);
+            ctx.fillRect(pad + i * barW + 1, h - pad - bh, Math.max(2, barW - 2), bh);
+        }
+
+        // Today indicator (last bar)
+        if (n > 0) {
+            ctx.fillStyle = "#0a0a0c";
+            ctx.font = "10px system-ui";
+            ctx.textAlign = "right";
+            ctx.fillText("$" + values[n - 1].toFixed(2) + " today", w - pad, 12);
+            ctx.textAlign = "left";
+            ctx.fillStyle = "#71717a";
+            ctx.fillText(data[0].day, pad, h - 4);
+            ctx.textAlign = "right";
+            ctx.fillText(data[n - 1].day, w - pad, h - 4);
+        }
+    })();
+    </script>
 
     <!-- Settings form -->
     <form method="post" class="border border-stone-200 rounded-lg p-5 bg-white space-y-4">

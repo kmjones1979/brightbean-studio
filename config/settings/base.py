@@ -181,8 +181,14 @@ if STORAGE_BACKEND.lower() == "s3":
         "CacheControl": "max-age=86400",
     }
 else:
+    # Local filesystem storage. Django 5+ requires both `default` and
+    # `staticfiles` keys in STORAGES — without `default`, FileFields
+    # raise InvalidStorageError on save.
     MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))
     MEDIA_URL = "/media/"
+    STORAGES["default"] = {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
