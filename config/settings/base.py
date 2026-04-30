@@ -64,6 +64,7 @@ LOCAL_APPS = [
     "apps.client_portal",
     "apps.onboarding",
     "apps.gtm",
+    "apps.ai",
     "theme",
 ]
 

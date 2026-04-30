@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}AI Settings - {{ workspace.name }} - Brightbean{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col min-h-0 p-6 max-w-4xl mx-auto w-full">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-stone-900">AI Settings</h1>
+        <p class="text-sm text-stone-500 mt-1">
+            Configure provider routing, monthly spend cap, and Shroud TEE inspection for this workspace.
+        </p>
+    </div>
+
+    {% if messages %}
+        {% for msg in messages %}
+            <div class="mb-4 p-3 rounded-lg bg-green-50 text-green-700 text-sm">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Spend dashboard -->
+    <div class="border border-stone-200 rounded-lg p-5 bg-white mb-6">
+        <h2 class="text-base font-semibold text-stone-900 mb-3">Monthly spend</h2>
+        <div class="flex items-end gap-3 mb-2">
+            <span class="text-3xl font-bold text-stone-900">${{ spend_usd|floatformat:2 }}</span>
+            <span class="text-sm text-stone-500 mb-1">of ${{ cap_usd }} cap</span>
+        </div>
+        <div class="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
+            <div class="h-full {% if spend_pct >= 100 %}bg-red-500{% elif spend_pct >= 80 %}bg-amber-500{% else %}bg-stone-700{% endif %}"
+                 style="width: {{ spend_pct|stringformat:'d' }}%"></div>
+        </div>
+        <p class="text-xs text-stone-500 mt-2">
+            Window started {{ config.spend_window_start|date:"M j, Y" }}.
+            {% if config.is_over_cap %}<span class="text-red-600 font-medium">Cap reached — generations blocked.</span>{% endif %}
+        </p>
+    </div>
+
+    <!-- Settings form -->
+    <form method="post" class="border border-stone-200 rounded-lg p-5 bg-white space-y-4">
+        {% csrf_token %}
+
+        <h2 class="text-base font-semibold text-stone-900">Routing &amp; defaults</h2>
+
+        {% for field in form %}
+            <div>
+                <label class="block text-xs font-medium text-stone-600 mb-1" for="{{ field.id_for_label }}">
+                    {{ field.label }}
+                </label>
+                {% if field.field.widget.input_type == "checkbox" %}
+                    <div class="flex items-center gap-2">
+                        {{ field }}
+                        <span class="text-sm text-stone-700">Enabled</span>
+                    </div>
+                {% else %}
+                    {{ field }}
+                {% endif %}
+                {% if field.help_text %}
+                    <p class="text-xs text-stone-500 mt-1">{{ field.help_text }}</p>
+                {% endif %}
+                {% for error in field.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endfor %}
+
+        <details class="text-xs text-stone-500">
+            <summary class="cursor-pointer hover:text-stone-700">Available pricing-known models ({{ available_models|length }})</summary>
+            <ul class="mt-2 grid grid-cols-2 gap-1 font-mono">
+                {% for m in available_models %}
+                    <li>{{ m }}</li>
+                {% endfor %}
+            </ul>
+        </details>
+
+        <div class="flex justify-end pt-3">
+            <button type="submit" class="px-3 py-2 text-sm font-medium rounded-lg bg-stone-900 text-white hover:bg-stone-800">
+                Save settings
+            </button>
+        </div>
+    </form>
+
+    <!-- Recent generations -->
+    <div class="border border-stone-200 rounded-lg bg-white mt-6 overflow-hidden">
+        <div class="p-4 border-b border-stone-200">
+            <h2 class="text-base font-semibold text-stone-900">Recent generations</h2>
+        </div>
+        {% if recent_generations %}
+            <table class="w-full text-sm">
+                <thead class="bg-stone-50 text-stone-600 text-xs uppercase">
+                    <tr>
+                        <th class="text-left px-4 py-2">When</th>
+                        <th class="text-left px-4 py-2">Kind</th>
+                        <th class="text-left px-4 py-2">Provider</th>
+                        <th class="text-left px-4 py-2">Status</th>
+                        <th class="text-right px-4 py-2">Cost</th>
+                        <th class="text-right px-4 py-2">Tokens</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-stone-200">
+                    {% for gen in recent_generations %}
+                        <tr>
+                            <td class="px-4 py-2 text-stone-700">{{ gen.created_at|date:"M j H:i" }}</td>
+                            <td class="px-4 py-2">{{ gen.kind }}</td>
+                            <td class="px-4 py-2">{{ gen.provider }}{% if gen.routed_via_shroud %} <span class="text-xs text-stone-500">via Shroud</span>{% endif %}</td>
+                            <td class="px-4 py-2">{{ gen.status }}</td>
+                            <td class="px-4 py-2 text-right">${{ gen.cost_usd|floatformat:4 }}</td>
+                            <td class="px-4 py-2 text-right">{{ gen.prompt_tokens }}+{{ gen.completion_tokens }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="text-sm text-stone-500 p-6 text-center">No AI generations yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
