@@ -58,7 +58,9 @@ class TestSeedCommand:
         plan.refresh_from_db()
         assert plan.compliance_notes == "User-customized note"
 
-    def test_demo_content_flag_warns(self, workspace):
+    def test_demo_content_flag_creates_stub_generations(self, workspace):
+        from apps.ai.models import AIGeneration
+
         out = io.StringIO()
         call_command(
             "seed_oneclaw_gtm",
@@ -66,7 +68,9 @@ class TestSeedCommand:
             demo_content=True,
             stdout=out,
         )
-        assert "Phase 2" in out.getvalue()
+        # 3 plans × 10 stubbed generations each = 30
+        assert AIGeneration.objects.for_workspace(workspace.id).count() == 30
+        assert "Seeded 30 stubbed AIGenerations" in out.getvalue()
 
     def test_uses_first_workspace_when_no_id(self, workspace):
         # Existing fixture creates `workspace` already
