@@ -183,6 +183,124 @@ def generate_multi_platform(request, workspace_id):
     )
 
 
+def _generic_kind_endpoint(request, *, kind: str, payload: dict, gtm_plan_id: str | None):
+    """Shared body for the simpler kind endpoints — queue + return pending partial."""
+    workspace = request.workspace
+    try:
+        gen = _queue_generation(
+            workspace=workspace,
+            actor=request.user,
+            kind=kind,
+            input_payload=payload,
+            gtm_plan_id=gtm_plan_id,
+        )
+    except CapExceededError as exc:
+        return render(
+            request,
+            "ai/partials/cap_exceeded.html",
+            {"workspace": workspace, "error": str(exc)},
+            status=429,
+        )
+    return render(
+        request,
+        "ai/partials/generation_pending.html",
+        {"workspace": workspace, "generation": gen},
+    )
+
+
+@require_workspace_role("editor")
+@require_POST
+def generate_hooks(request, workspace_id):
+    brief = (request.POST.get("brief") or "").strip()
+    if not brief:
+        return HttpResponseBadRequest("brief is required")
+    return _generic_kind_endpoint(
+        request,
+        kind=GenerationKind.HOOK,
+        payload={"brief": brief},
+        gtm_plan_id=request.POST.get("gtm_plan_id") or None,
+    )
+
+
+@require_workspace_role("editor")
+@require_POST
+def generate_cta(request, workspace_id):
+    brief = (request.POST.get("brief") or "").strip()
+    if not brief:
+        return HttpResponseBadRequest("brief is required")
+    return _generic_kind_endpoint(
+        request,
+        kind=GenerationKind.CTA,
+        payload={"brief": brief},
+        gtm_plan_id=request.POST.get("gtm_plan_id") or None,
+    )
+
+
+@require_workspace_role("editor")
+@require_POST
+def generate_hashtags(request, workspace_id):
+    brief = (request.POST.get("brief") or "").strip()
+    platform = request.POST.get("platform") or "twitter"
+    if not brief:
+        return HttpResponseBadRequest("brief is required")
+    return _generic_kind_endpoint(
+        request,
+        kind=GenerationKind.HASHTAGS,
+        payload={"brief": brief, "platform": platform},
+        gtm_plan_id=request.POST.get("gtm_plan_id") or None,
+    )
+
+
+@require_workspace_role("editor")
+@require_POST
+def generate_brief_expand(request, workspace_id):
+    brief = (request.POST.get("brief") or "").strip()
+    if not brief:
+        return HttpResponseBadRequest("brief is required")
+    return _generic_kind_endpoint(
+        request,
+        kind=GenerationKind.BRIEF_EXPAND,
+        payload={"brief": brief},
+        gtm_plan_id=request.POST.get("gtm_plan_id") or None,
+    )
+
+
+@require_workspace_role("editor")
+@require_POST
+def generate_idea_seed(request, workspace_id):
+    brief = (request.POST.get("brief") or "").strip()
+    try:
+        count = int(request.POST.get("count") or 8)
+    except ValueError:
+        count = 8
+    count = max(1, min(20, count))
+    return _generic_kind_endpoint(
+        request,
+        kind=GenerationKind.IDEA_SEED,
+        payload={"brief": brief, "extra": {"count": count}},
+        gtm_plan_id=request.POST.get("gtm_plan_id") or None,
+    )
+
+
+@require_workspace_role("editor")
+@require_POST
+def generate_reply_draft(request, workspace_id):
+    original_text = (request.POST.get("original_text") or "").strip()
+    platform = request.POST.get("platform") or ""
+    author = request.POST.get("author") or ""
+    if not original_text:
+        return HttpResponseBadRequest("original_text is required")
+    return _generic_kind_endpoint(
+        request,
+        kind=GenerationKind.REPLY_DRAFT,
+        payload={
+            "brief": original_text,
+            "extra": {"original_text": original_text, "platform": platform, "author": author},
+        },
+        gtm_plan_id=request.POST.get("gtm_plan_id") or None,
+    )
+
+
 @require_workspace_role("viewer")
 @require_GET
 def generation_poll(request, workspace_id, generation_id):
@@ -199,6 +317,14 @@ def generation_poll(request, workspace_id, generation_id):
         except (TypeError, ValueError):
             parsed_output = {"text": text}
 
+    parsed_tiers = []
+    if isinstance(parsed_output, dict) and any(k in parsed_output for k in ("broad", "niche", "branded")):
+        parsed_tiers = [
+            ("Broad", parsed_output.get("broad", [])),
+            ("Niche", parsed_output.get("niche", [])),
+            ("Branded", parsed_output.get("branded", [])),
+        ]
+
     return render(
         request,
         "ai/partials/generation_result.html",
@@ -206,6 +332,7 @@ def generation_poll(request, workspace_id, generation_id):
             "workspace": workspace,
             "generation": gen,
             "parsed": parsed_output,
+            "parsed_tiers": parsed_tiers,
             "is_terminal": gen.status
             in (
                 GenerationStatus.SUCCEEDED,
@@ -238,5 +365,17 @@ def generate_panel(request, workspace_id):
             "selected_plan_id": selected_plan_id,
             "platform_specs": PLATFORM_SPECS,
             "default_platform": "twitter",
+            "kind_modes": KIND_MODES,
         },
     )
+
+
+KIND_MODES = [
+    ("caption", "Caption"),
+    ("multi_platform", "Multi-platform"),
+    ("hooks", "Hooks"),
+    ("cta", "CTAs"),
+    ("hashtags", "Hashtags"),
+    ("brief_expand", "Expand brief"),
+    ("idea_seed", "Seed ideas"),
+]

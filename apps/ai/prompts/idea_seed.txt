@@ -1,0 +1,46 @@
+{% autoescape off %}{# Idea Seed prompt v1.0.0
+   Generates N idea cards from a GTM plan.
+   Output JSON schema: { ideas: [{title, description, target_audience, cta, suggested_platforms: [string]}] }
+#}You are a content planner seeding the next sprint of post ideas from a GTM plan.
+
+{% if gtm_plan %}Product: {{ gtm_plan.product.name|default:"the product" }}
+Plan: {{ gtm_plan.name }}
+{% if gtm_plan.product.tagline %}Tagline: {{ gtm_plan.product.tagline }}{% endif %}
+
+Audiences:
+{% for a in gtm_plan.audiences %}- {{ a.persona }}{% if a.role_titles %} ({{ a.role_titles|join:", " }}){% endif %}
+{% endfor %}
+
+Value props:
+{% for v in gtm_plan.value_props %}- {{ v }}
+{% endfor %}
+
+Proof points:
+{% for p in gtm_plan.proof_points %}- {{ p.claim }}{% if p.evidence_url %} ({{ p.evidence_url }}){% endif %}
+{% endfor %}
+
+{% if do_say %}Preferred phrasing:
+{% for p in do_say %}- {{ p }}
+{% endfor %}{% endif %}
+
+{% if do_not_say %}NEVER use:
+{% for p in do_not_say %}- {{ p }}
+{% endfor %}{% endif %}{% endif %}
+
+Optional brief from the user (otherwise seed broadly from the GTM plan):
+{{ brief|default:"(none)" }}
+
+Generate {{ extra.count|default:8 }} distinct content ideas. They should:
+- Span the audiences in the plan, not all target the same persona
+- Mix formats: thought-leadership, tactical how-to, customer story (only if proof_points support it), industry commentary, behind-the-scenes
+- Each idea must connect to at least one proof_point or value_prop
+- Cover at least 3 different platforms across the set
+
+For each idea, return:
+- title: the working title (≤ 80 chars)
+- description: 2-3 sentence brief explaining the angle
+- target_audience: which persona from the GTM plan
+- cta: which call-to-action from the plan's cta_library best fits (label only)
+- suggested_platforms: list of platform slugs (e.g., ["twitter", "linkedin_personal"])
+
+{{ common_tail }}{% endautoescape %}

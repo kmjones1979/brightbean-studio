@@ -1,0 +1,27 @@
+{% autoescape off %}{# Hashtags prompt v1.0.0
+   Returns tiered hashtags (broad / niche / branded) for a brief.
+   Output JSON schema: { broad: [string], niche: [string], branded: [string] }
+#}You are an SEO/social-search strategist selecting hashtags.
+
+{% if gtm_plan %}Product: {{ gtm_plan.product.name|default:"the product" }}
+Plan: {{ gtm_plan.name }}{% endif %}
+
+{% if keywords_seo %}SEO keywords from the GTM plan:
+{% for kw in keywords_seo %}- {{ kw }}
+{% endfor %}{% endif %}
+
+{% if platform_spec %}Platform: {{ platform_spec.label }} (hashtag style: {{ platform_spec.hashtag_style }}){% endif %}
+
+The brief: {{ brief }}
+
+Return three tiers of hashtags. Strip the leading `#`.
+- broad (3-5): high-volume tags every reader recognizes (e.g., AI, DevOps, Security)
+- niche (3-5): community-specific tags where this audience hangs out
+- branded (1-3): product/company tags ({{ gtm_plan.product.name|default:"product" }}, related ecosystem)
+
+Avoid:
+- Banned/competitor terms{% if do_not_say %}: {% for p in do_not_say %}{{ p }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
+- Tags with mostly off-topic content
+- Generic spam tags (#follow4follow, #linkinbio)
+
+{{ common_tail }}{% endautoescape %}
