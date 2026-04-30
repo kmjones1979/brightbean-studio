@@ -433,14 +433,74 @@ class Command(BaseCommand):
         workspace = self._resolve_workspace(options.get("workspace_id"))
         partner = self._upsert_partner(workspace)
 
+        plans_for_demo = []
         for product_name, product_fields, plan_data in PRODUCT_DEFS:
             product = self._upsert_product(partner, product_name, product_fields)
-            self._upsert_plan(workspace, partner, product, plan_data)
+            plan = self._upsert_plan(workspace, partner, product, plan_data)
+            plans_for_demo.append(plan)
 
         if options.get("demo_content"):
-            self.stdout.write(self.style.WARNING("--demo-content is a no-op until Phase 2 (apps/ai) is shipped."))
+            self._seed_demo_generations(workspace, plans_for_demo)
 
         self.stdout.write(self.style.SUCCESS(f"Seeded 1Claw GTM data into workspace {workspace.name}"))
+
+    def _seed_demo_generations(self, workspace, plans):
+        """Populate ~10 stubbed AIGeneration rows per plan using the StubProvider.
+        No real LLM calls. Useful for screenshots and review without API keys.
+        """
+        try:
+            from apps.ai.models import (
+                AIGeneration,
+                GenerationKind,
+                GenerationStatus,
+            )
+        except ImportError:
+            self.stdout.write(self.style.WARNING("  --demo-content skipped: apps.ai not installed."))
+            return
+
+        kinds = [
+            GenerationKind.CAPTION,
+            GenerationKind.MULTI_PLATFORM,
+            GenerationKind.HOOK,
+            GenerationKind.CTA,
+            GenerationKind.HASHTAGS,
+        ]
+        platforms = ["twitter", "linkedin_personal", "bluesky"]
+        sample_briefs = [
+            "Announce that our MCP server now ships 17 native tools",
+            "Why 'agents need credentials too' is the AI security story of 2026",
+            "Quick demo: redacting a Stripe key before it hits the LLM",
+            "Comparison post — vault-aware redaction vs regex-only",
+            "Behind the scenes: AMD SEV-SNP TEE on GKE",
+        ]
+
+        created = 0
+        for plan in plans:
+            for i in range(10):
+                kind = kinds[i % len(kinds)]
+                platform = platforms[i % len(platforms)]
+                brief = sample_briefs[i % len(sample_briefs)]
+                AIGeneration.objects.create(
+                    workspace=workspace,
+                    actor=None,
+                    kind=kind,
+                    gtm_plan=plan,
+                    input_payload={"brief": brief, "platform": platform, "demo": True},
+                    provider="stub",
+                    model="claude-sonnet-4-6",
+                    routed_via_shroud=False,
+                    output_payload={
+                        "text": f"[demo] {brief} — variant {i + 1}",
+                    },
+                    prompt_tokens=150,
+                    completion_tokens=80,
+                    cost_usd_micro=1_650,
+                    latency_ms=420,
+                    status=GenerationStatus.SUCCEEDED,
+                )
+                created += 1
+
+        self.stdout.write(self.style.SUCCESS(f"  + Seeded {created} stubbed AIGenerations"))
 
     def _resolve_workspace(self, workspace_id_arg) -> Workspace:
         if workspace_id_arg:

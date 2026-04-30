@@ -1,0 +1,70 @@
+{% comment %}
+Renders one of:
+- Still pending (poll again — uses generation_pending.html)
+- Succeeded (variants displayed, with Use / Copy / Regenerate)
+- Failed / blocked (error message)
+{% endcomment %}
+
+{% if not is_terminal %}
+    {% include "ai/partials/generation_pending.html" %}
+{% elif generation.status == "succeeded" %}
+    <div class="space-y-3">
+        <div class="flex items-center justify-between text-xs text-stone-500">
+            <span>
+                {{ generation.provider }} · {{ generation.model }}
+                {% if generation.routed_via_shroud %} · via Shroud{% endif %}
+                · ${{ generation.cost_usd|floatformat:4 }} · {{ generation.latency_ms }}ms
+            </span>
+            <span>{{ generation.prompt_tokens }}+{{ generation.completion_tokens }} tokens</span>
+        </div>
+
+        {% if parsed.variants %}
+            {% for v in parsed.variants %}
+                <div class="border border-stone-200 rounded-lg p-4 bg-white">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs text-stone-500">
+                            {% if v.platform %}{{ v.platform }} · {% endif %}
+                            {{ v.char_count }} chars
+                        </span>
+                        <button onclick="navigator.clipboard.writeText(this.dataset.copy)"
+                                data-copy="{{ v.text|escape }}"
+                                class="text-xs px-2 py-1 rounded border border-stone-200 hover:bg-stone-50">
+                            Copy
+                        </button>
+                    </div>
+                    <p class="text-sm text-stone-900 whitespace-pre-wrap">{{ v.text }}</p>
+                    {% if v.hashtags %}
+                        <p class="text-xs text-stone-500 mt-2">
+                            {% for h in v.hashtags %}#{{ h }}{% if not forloop.last %} {% endif %}{% endfor %}
+                        </p>
+                    {% endif %}
+                    {% if v.first_comment %}
+                        <p class="text-xs text-stone-500 mt-2 italic">First comment: {{ v.first_comment }}</p>
+                    {% endif %}
+                    {% if v.rationale %}
+                        <p class="text-xs text-stone-400 mt-2">{{ v.rationale }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <pre class="text-xs bg-stone-50 p-4 rounded-lg overflow-x-auto">{{ parsed|default:generation.output_payload.text }}</pre>
+        {% endif %}
+
+        {% if generation.shroud_redactions %}
+            <details class="text-xs text-stone-500 border border-stone-200 rounded-lg p-3">
+                <summary class="cursor-pointer">{{ generation.shroud_redactions|length }} Shroud redaction(s)</summary>
+                <pre class="mt-2 text-xs">{{ generation.shroud_redactions|safe }}</pre>
+            </details>
+        {% endif %}
+    </div>
+{% elif generation.status == "blocked_by_shroud" %}
+    <div class="border border-amber-200 bg-amber-50 rounded-lg p-4">
+        <p class="text-sm font-medium text-amber-900 mb-1">Blocked by Shroud</p>
+        <p class="text-xs text-amber-800">{{ generation.error_message }}</p>
+    </div>
+{% else %}
+    <div class="border border-red-200 bg-red-50 rounded-lg p-4">
+        <p class="text-sm font-medium text-red-900 mb-1">Generation failed</p>
+        <p class="text-xs text-red-800">{{ generation.error_message }}</p>
+    </div>
+{% endif %}

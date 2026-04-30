@@ -1,0 +1,16 @@
+{% comment %}
+Pending state — HTMX-polls the generation row every second until terminal.
+{% endcomment %}
+<div hx-get="{% url 'ai:generation_poll' workspace_id=workspace.id generation_id=generation.id %}"
+     hx-trigger="load delay:1s, every 1s"
+     hx-swap="outerHTML"
+     class="border border-stone-200 rounded-lg p-6 bg-white text-center">
+    <div class="inline-flex items-center gap-2 text-sm text-stone-600">
+        <svg class="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        Generating with {{ generation.provider|default:"AI" }}…
+    </div>
+    <p class="text-xs text-stone-400 mt-2">{{ generation.kind }} · {{ generation.id }}</p>
+</div>

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}AI Generate - {{ workspace.name }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 flex flex-col min-h-0 p-6 max-w-4xl mx-auto w-full">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-stone-900">
+            <span class="brand-gradient-text font-wordmark">AI</span> Compose
+        </h1>
+        <p class="text-sm text-stone-500 mt-1">
+            Brief in, content out. Backed by your GTM plans for voice, claims, and proof.
+        </p>
+    </div>
+
+    {% include "ai/partials/_panel_inner.html" %}
+</div>
+{% endblock %}
