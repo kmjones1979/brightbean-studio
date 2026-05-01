@@ -27,4 +27,10 @@ urlpatterns = [
         views.generation_poll,
         name="generation_poll",
     ),
+    # Add idea_seed result to Kanban board
+    path(
+        "generation/<uuid:generation_id>/add-to-board/",
+        views.add_ideas_to_board,
+        name="add_ideas_to_board",
+    ),
 ]

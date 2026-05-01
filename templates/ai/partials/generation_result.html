@@ -130,7 +130,18 @@ Renders one of:
                 {% endif %}
             </div>
         {% elif parsed.ideas %}
-            {# idea_seed #}
+            {# idea_seed — adds an "Add all to board" CTA above the cards #}
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-xs text-stone-500">{{ parsed.ideas|length }} idea{{ parsed.ideas|length|pluralize }} generated</p>
+                <button hx-post="{% url 'ai:add_ideas_to_board' workspace_id=workspace.id generation_id=generation.id %}"
+                        hx-target="#ideas-added-status"
+                        hx-swap="innerHTML"
+                        class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-primary text-white hover:bg-primary-hover">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg>
+                    Add all to Kanban board
+                </button>
+            </div>
+            <div id="ideas-added-status" class="mb-3"></div>
             <div class="grid sm:grid-cols-2 gap-3">
                 {% for idea in parsed.ideas %}
                     <div class="border border-stone-200 rounded-lg p-4 bg-white">

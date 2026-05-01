@@ -342,6 +342,80 @@ def generate_reply_draft(request, workspace_id):
     )
 
 
+@require_workspace_role("editor")
+@require_POST
+def add_ideas_to_board(request, workspace_id, generation_id):
+    """Convert an idea_seed generation's parsed ideas into Idea rows on the
+    Kanban board (composer.Idea). Returns a partial confirming the count.
+    """
+    from apps.composer.models import Idea, IdeaGroup
+
+    workspace = request.workspace
+    gen = get_object_or_404(
+        AIGeneration.objects.for_workspace(workspace.id),
+        id=generation_id,
+    )
+
+    if gen.kind != GenerationKind.IDEA_SEED:
+        return HttpResponseBadRequest("Generation is not idea_seed")
+    if gen.status != GenerationStatus.SUCCEEDED:
+        return HttpResponseBadRequest("Generation has not succeeded")
+
+    text = (gen.output_payload or {}).get("text", "")
+    try:
+        parsed = json.loads(text)
+    except (TypeError, ValueError):
+        return HttpResponseBadRequest("Output is not parseable JSON")
+
+    ideas = parsed.get("ideas") or []
+    if not ideas:
+        return HttpResponseBadRequest("No ideas in generation output")
+
+    # Pick the first non-Done IdeaGroup, or create an "Ideas" group
+    group = IdeaGroup.objects.for_workspace(workspace.id).order_by("position").first()
+    if group is None:
+        group = IdeaGroup.objects.create(workspace=workspace, name="Ideas", position=0)
+
+    plan_tag = gen.gtm_plan.name if gen.gtm_plan else None
+    base_position = Idea.objects.filter(group=group).count()
+
+    created = []
+    for i, idea in enumerate(ideas):
+        title = (idea.get("title") or "").strip()[:255] or "Untitled"
+        desc = (idea.get("description") or "").strip()
+        platforms = idea.get("suggested_platforms") or []
+        tags = ["ai-generated"]
+        if plan_tag:
+            tags.append(f"plan:{plan_tag[:50]}")
+        if idea.get("target_audience"):
+            tags.append(f"audience:{idea['target_audience'][:40]}")
+        for p in platforms[:3]:
+            tags.append(p)
+
+        Idea.objects.create(
+            workspace=workspace,
+            author=request.user,
+            title=title,
+            description=desc,
+            tags=tags,
+            group=group,
+            position=base_position + i,
+            status=Idea.Status.UNASSIGNED,
+        )
+        created.append(title)
+
+    return render(
+        request,
+        "ai/partials/ideas_added.html",
+        {
+            "workspace": workspace,
+            "count": len(created),
+            "group_name": group.name,
+            "titles": created[:5],
+        },
+    )
+
+
 @require_workspace_role("viewer")
 @require_GET
 def generation_poll(request, workspace_id, generation_id):
