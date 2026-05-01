@@ -56,3 +56,16 @@ def manager_membership(db, user, workspace):
 @pytest.fixture
 def viewer_membership(db, user, workspace):
     return _make_member(user, workspace, "viewer")
+
+
+@pytest.fixture
+def plan(db, workspace):
+    """A simple GTMPlan fixture for AI tests that need one."""
+    from apps.gtm.models import GTMPlan, Partner
+
+    partner = Partner.objects.create(workspace=workspace, name="1Claw")
+    return GTMPlan.objects.create(
+        workspace=workspace,
+        partner=partner,
+        name="Shroud test plan",
+    )

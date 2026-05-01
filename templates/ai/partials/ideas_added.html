@@ -1,0 +1,15 @@
+<div class="border border-green-200 bg-green-50 rounded-lg p-4">
+    <p class="text-sm font-semibold text-green-900 mb-1">
+        ✓ Added {{ count }} idea{{ count|pluralize }} to <strong>{{ group_name }}</strong>
+    </p>
+    {% if titles %}
+        <ul class="text-xs text-green-800 mt-2 space-y-1 list-disc ml-5">
+            {% for t in titles %}<li>{{ t }}</li>{% endfor %}
+            {% if count > 5 %}<li>... and {{ count|add:"-5" }} more</li>{% endif %}
+        </ul>
+    {% endif %}
+    <a href="{% url 'composer:create_landing' workspace_id=workspace.id %}"
+       class="inline-flex text-xs px-2.5 py-1 mt-3 rounded border border-green-300 text-green-800 hover:bg-green-100">
+        View Kanban →
+    </a>
+</div>
